@@ -1,0 +1,6 @@
+﻿<?xml version="1.0"?>
+<config_options>
+	<op ver="0.1" ip="66.70.228.191" port="40200"/>
+	<BUGTRAP ip="127.0.0.1" port ="9999" folder="七龙珠Online" />
+	<localize folder="Taiwan" />
+</config_options>

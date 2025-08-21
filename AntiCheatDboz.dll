@@ -1,0 +1,87 @@
+// anti_cheat_dboz.dll
+
+#include <windows.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <chrono>
+#include <ctime>
+#include <thread>
+#include <sstream>
+
+// --- Configuration ---
+const wchar_t* GAME_PROCESS_NAME = L"Dboclient.exe";
+const wchar_t* LOG_FILE_PATH = L"anti_cheat_log.txt"; // Local log file for simulation
+const std::string NOTIFICATION_URL = "YOUR_NOTIFICATION_ENDPOINT_HERE"; // Replace with your actual endpoint
+
+
+std::string GetTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+void LogMessage(const std::wstring& message) {
+    std::wofstream logFile(LOG_FILE_PATH, std::ios_base::app);
+    if (logFile.is_open()) {
+        logFile << GetTimestamp().c_str() << L" [Anti-Cheat] " << message << std::endl;
+        logFile.close();
+    }
+}
+
+void SendNotification(const std::string& message) {
+    std::cout << "[Anti-Cheat] Simulated Notification: " << message << " (To: " << NOTIFICATION_URL << ")" << std::endl;
+    LogMessage(std::wstring(message.begin(), message.end()).c_str());
+    // In a real scenario, you would use network libraries (e.g., WinInet, Boost.Asio, curl)
+    // to send an HTTP request (POST, GET) to your server-side endpoint.
+}
+
+// Function to periodically check if the DLL is still loaded
+void MonitorDllPresence(HMODULE hModule) {
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(5)); // Check every 5 seconds
+
+        static bool isDllLoaded = true; // Static variable to track DLL load state
+
+        
+
+        if (!isDllLoaded) {
+            std::string notificationMessage = "Anti-Cheat DLL unloaded from process: ";
+            wchar_t buffer[MAX_PATH];
+            if (GetModuleFileNameW(NULL, buffer, MAX_PATH)) { // Get the process name
+                notificationMessage += std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(buffer);
+            } else {
+                notificationMessage += "Unknown Process";
+            }
+            SendNotification(notificationMessage);
+            break; // Exit the monitoring loop
+        }
+    }
+}
+
+// --- DLL Entry Point ---
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+    static std::thread* monitoringThread = nullptr;
+
+    switch (ul_reason_for_call) {
+        case DLL_PROCESS_ATTACH:
+            LogMessage(L"DLL Attached to process.");
+            // Start the monitoring thread
+            monitoringThread = new std::thread(MonitorDllPresence, hModule);
+            monitoringThread->detach(); // Let it run independently
+            break;
+        case DLL_THREAD_ATTACH:
+            break;
+        case DLL_THREAD_DETACH:
+            break;
+        case DLL_PROCESS_DETACH:
+            LogMessage(L"DLL Detached from process.");
+            static bool isDllLoaded = true;
+            isDllLoaded = false;
+
+            break;
+    }
+    return TRUE;
+}
